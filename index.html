@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Frolight Frost Monitor — Riversdale Estate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root {
+    --dark-green: #142719;
+    --mid-green: #326345;
+    --orange: #ea5b26;
+    --ice-blue: #7fb8d9;
+    --cream: #f4f1ea;
+    --text-on-dark: #f4f1ea;
+    --text-muted-on-dark: #9fb3a7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Work Sans', -apple-system, sans-serif;
+    background: var(--cream);
+    color: #1c1c1a;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px 80px; }
+
+  /* Hero */
+  .hero {
+    background: linear-gradient(160deg, var(--dark-green) 0%, var(--mid-green) 100%);
+    color: var(--text-on-dark);
+    padding: 56px 0 64px;
+    margin-bottom: -40px;
+  }
+  .hero-inner { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+  .eyebrow-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+  .eyebrow {
+    font-size: 22px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--orange);
+    font-weight: 700;
+  }
+  .site-select {
+    background: rgba(244,241,234,0.1);
+    border: 1px solid rgba(244,241,234,0.24);
+    color: var(--text-on-dark);
+    font-family: 'Work Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    max-width: 160px;
+    text-overflow: ellipsis;
+  }
+  .site-select option { color: #1c1c1a; }
+  .refresh-btn {
+    background: rgba(244,241,234,0.1);
+    border: 1px solid rgba(244,241,234,0.24);
+    color: var(--text-on-dark);
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.4s ease, background 0.15s ease;
+  }
+  .refresh-btn:hover { background: rgba(244,241,234,0.2); }
+  .refresh-btn.spinning svg { animation: spin 0.7s linear; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .new-site-btn {
+    background: var(--orange);
+    border: none;
+    color: #fff;
+    font-family: 'Work Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .new-site-btn:hover { background: #d64f1c; }
+  .manage-sites-btn {
+    background: var(--orange);
+    border: none;
+    color: #fff;
+    font-family: 'Work Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .manage-sites-btn:hover { background: #d64f1c; }
+  .site-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px; border: 1px solid #e8e4d9; border-radius: 10px; margin-bottom: 8px;
+  }
+  .site-row-name { font-size: 14px; font-weight: 600; color: #1c1c1a; }
+  .site-row-coords { font-size: 11px; color: #a3a196; margin-top: 2px; }
+  .site-delete-btn {
+    background: #fbe0d5; color: #a3390f; border: none; border-radius: 8px;
+    width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0;
+  }
+  .site-delete-btn:hover { background: #f5c7b5; }
+  .unit-toggle {
+    display: flex;
+    background: rgba(244,241,234,0.1);
+    border: 1px solid rgba(244,241,234,0.24);
+    border-radius: 20px;
+    padding: 2px;
+  }
+  .unit-btn {
+    background: transparent; border: none; cursor: pointer;
+    font-family: 'Work Sans', sans-serif; font-size: 12px; font-weight: 600;
+    color: var(--text-muted-on-dark);
+    padding: 6px 12px; border-radius: 18px;
+  }
+  .unit-btn.active { background: var(--orange); color: #fff; }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(20,39,25,0.55);
+    z-index: 5000;
+    align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: #fff;
+    border-radius: 18px;
+    padding: 32px;
+    max-width: 440px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal h2 {
+    font-family: 'Abril Fatface', serif;
+    font-size: 22px;
+    font-weight: 400;
+    color: var(--dark-green);
+    margin-bottom: 6px;
+  }
+  .modal-sub { font-size: 13px; color: #6b6b64; margin-bottom: 22px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label {
+    display: block; font-size: 12px; font-weight: 600; color: #44443f;
+    margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.03em;
+  }
+  .form-group input {
+    width: 100%; padding: 10px 12px; border: 1px solid #e0dccf; border-radius: 8px;
+    font-family: 'Work Sans', sans-serif; font-size: 14px; color: #1c1c1a;
+  }
+  .form-group input:focus { outline: none; border-color: var(--mid-green); }
+  .address-row { display: flex; gap: 8px; }
+  .address-row input { flex: 1; }
+  .search-addr-btn {
+    background: var(--mid-green); color: #fff; border: none; border-radius: 8px;
+    padding: 0 16px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .search-addr-btn:hover { background: #294f37; }
+  .coords-row { display: flex; gap: 10px; }
+  .coords-row .form-group { flex: 1; }
+  .form-hint { font-size: 12px; color: #a3a196; margin-top: 4px; }
+  .form-hint.success { color: var(--mid-green); }
+  .form-hint.error { color: #a3390f; }
+  #new-site-map {
+    height: 200px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+    border: 1px solid #e0dccf;
+  }
+  .map-hint { font-size: 11px; color: #a3a196; margin: -10px 0 16px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 24px; }
+  .btn-primary, .btn-secondary {
+    flex: 1; padding: 12px; border-radius: 10px; font-size: 14px; font-weight: 600;
+    cursor: pointer; border: none; font-family: 'Work Sans', sans-serif;
+  }
+  .btn-primary { background: var(--dark-green); color: #fff; }
+  .btn-primary:hover { background: #0d1c12; }
+  .btn-primary:disabled { background: #b9c4bc; cursor: not-allowed; }
+  .btn-secondary { background: #f1efe8; color: #44443f; }
+  .btn-secondary:hover { background: #e5e1d5; }
+  h1 {
+    font-family: 'Abril Fatface', serif;
+    font-size: clamp(32px, 5vw, 52px);
+    font-weight: 400;
+    line-height: 1.1;
+    margin-bottom: 8px;
+  }
+  .location-meta {
+    font-size: 14px;
+    color: var(--text-muted-on-dark);
+    margin-bottom: 32px;
+  }
+  #map {
+    height: 200px;
+    border-radius: 14px;
+    margin-bottom: 24px;
+    border: 1px solid rgba(244,241,234,0.16);
+  }
+  .leaflet-container { background: #dfe6df; font-family: 'Work Sans', sans-serif; }
+  .status-banner {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    background: rgba(244,241,234,0.08);
+    border: 1px solid rgba(244,241,234,0.16);
+    border-radius: 14px;
+    padding: 20px 24px;
+    transition: background 0.2s ease;
+  }
+  .status-banner.severity-marginal { background: #f5cc4d; border-color: transparent; }
+  .status-banner.severity-moderate { background: #f2954a; border-color: transparent; }
+  .status-banner.severity-severe { background: #de5426; border-color: transparent; }
+  .status-banner.severity-critical { background: #8f1d0f; border-color: transparent; }
+  .status-icon {
+    width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(244,241,234,0.12);
+  }
+  .status-icon svg { width: 24px; height: 24px; }
+  .status-banner.severity-marginal .status-icon,
+  .status-banner.severity-moderate .status-icon { background: rgba(20,39,25,0.14); color: #2e1f00; }
+  .status-banner.severity-severe .status-icon,
+  .status-banner.severity-critical .status-icon { background: rgba(244,241,234,0.22); color: #fff; }
+  .status-icon.safe { color: var(--ice-blue); }
+  .status-text-main { font-size: 18px; font-weight: 700; }
+  .status-text-sub { font-size: 13px; color: var(--text-muted-on-dark); margin-top: 3px; }
+  .status-banner.severity-marginal .status-text-main,
+  .status-banner.severity-moderate .status-text-main { color: #2e1f00; }
+  .status-banner.severity-marginal .status-text-sub,
+  .status-banner.severity-moderate .status-text-sub { color: #4a3600; }
+  .status-banner.severity-severe .status-text-main,
+  .status-banner.severity-critical .status-text-main { color: #fff; }
+  .status-banner.severity-severe .status-text-sub,
+  .status-banner.severity-critical .status-text-sub { color: rgba(255,255,255,0.85); }
+
+  /* Cards container */
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 1px 3px rgba(20,39,25,0.08), 0 8px 24px rgba(20,39,25,0.06);
+    padding: 32px;
+    margin-bottom: 24px;
+    position: relative;
+    z-index: 1;
+  }
+  .section-title {
+    font-family: 'Abril Fatface', serif;
+    font-size: 24px;
+    font-weight: 400;
+    color: var(--dark-green);
+    margin-bottom: 4px;
+  }
+  .section-sub {
+    font-size: 13px;
+    color: #6b6b64;
+    margin-bottom: 24px;
+  }
+
+  /* 7-day forecast strip */
+  .forecast-strip {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 10px;
+  }
+  .day-card {
+    border: 1px solid #e8e4d9;
+    border-radius: 12px;
+    padding: 14px 10px;
+    text-align: center;
+    position: relative;
+  }
+  .day-card.frost-risk { border-color: var(--orange); background: #fdf3ee; }
+  .day-info-btn {
+    position: absolute; top: 4px; right: 4px;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: rgba(20,39,25,0.08); border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: #6b6b64; padding: 0;
+  }
+  .day-card.frost-risk .day-info-btn { background: rgba(234,91,38,0.15); color: var(--orange); }
+  .day-info-btn:hover { background: rgba(20,39,25,0.18); }
+  .day-name { font-size: 12px; font-weight: 600; color: #6b6b64; text-transform: uppercase; letter-spacing: 0.04em; }
+  .day-date { font-size: 11px; color: #a3a196; margin-bottom: 10px; }
+  .day-temp-max { font-size: 20px; font-weight: 600; color: var(--dark-green); display: flex; align-items: center; justify-content: center; gap: 3px; }
+  .day-temp-min { font-size: 13px; color: #6b6b64; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 3px; }
+  .day-skin { font-size: 11px; padding: 3px 8px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+  .day-skin.risk { background: var(--orange); color: #fff; }
+  .day-skin.safe { background: #eef2ea; color: var(--mid-green); }
+  .day-wind { font-size: 11px; color: #a3a196; margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 4px; }
+  .icon { width: 13px; height: 13px; flex-shrink: 0; }
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 16px;
+    font-size: 11px; color: #a3a196; margin-top: 14px;
+    padding-top: 14px; border-top: 1px solid #f1efe8;
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend .icon { width: 12px; height: 12px; }
+
+  /* Frost events */
+  .event-list { display: flex; flex-direction: column; gap: 14px; }
+  .event {
+    border: 1px solid #e8e4d9;
+    border-radius: 14px;
+    padding: 20px 22px;
+  }
+  .event-head {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    flex-wrap: wrap; gap: 10px; margin-bottom: 12px;
+  }
+  .event-date { font-size: 15px; font-weight: 600; color: var(--dark-green); }
+  .badge-row { display: flex; gap: 8px; }
+  .badge {
+    font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px;
+    text-transform: uppercase; letter-spacing: 0.03em;
+  }
+  .badge-type { background: #eef2ea; color: var(--mid-green); }
+  .badge-severity-marginal { background: #f5cc4d; color: #4a3600; }
+  .badge-severity-moderate { background: #f2954a; color: #3d1f00; }
+  .badge-severity-severe { background: #de5426; color: #fff; }
+  .badge-severity-critical { background: #8f1d0f; color: #fff; }
+  .event-figures {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+    padding: 14px 0;
+    border-top: 1px solid #f1efe8;
+    border-bottom: 1px solid #f1efe8;
+  }
+  .fig-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: #a3a196; margin-bottom: 2px; }
+  .fig-value { font-size: 15px; font-weight: 600; color: #1c1c1a; }
+  .timing-row {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    background: #fdf3ee; border-radius: 10px; padding: 12px;
+    margin-bottom: 14px; flex-wrap: wrap;
+  }
+  .timing-step { text-align: center; }
+  .timing-arrow { color: var(--orange); font-weight: 700; font-size: 15px; }
+  .timing-title {
+    flex-basis: 100%; text-align: center;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.04em; color: var(--orange); margin-bottom: 6px;
+  }
+  .advisory { font-size: 13.5px; color: #44443f; line-height: 1.6; }
+
+  .empty-state, .loading-state, .error-state {
+    text-align: center; padding: 40px 20px; color: #6b6b64; font-size: 14px;
+  }
+  .error-state { color: #a3390f; }
+
+  footer {
+    text-align: center; font-size: 12px; color: #a3a196; margin-top: 24px;
+  }
+
+  @media (max-width: 720px) {
+    .forecast-strip { grid-template-columns: repeat(4, 1fr); }
+  }
+  @media (max-width: 480px) {
+    .forecast-strip { grid-template-columns: repeat(3, 1fr); }
+    .hero { padding: 40px 0 48px; }
+    .card { padding: 22px 18px; }
+    .modal { padding: 24px 20px; }
+    h1 { font-size: 28px; }
+    .site-select { max-width: 130px; }
+    .eyebrow { font-size: 17px; }
+    .event-figures { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="eyebrow-row" style="margin-bottom: 8px;">
+      <div class="eyebrow">Frolight frost monitor</div>
+      <button class="refresh-btn" id="refresh-btn" onclick="refreshDashboard()" aria-label="Refresh data" title="Refresh data">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+      </button>
+    </div>
+    <div style="display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+      <div class="unit-toggle">
+        <button class="unit-btn active" id="unit-c-btn" onclick="setUnit('C')">°C</button>
+        <button class="unit-btn" id="unit-f-btn" onclick="setUnit('F')">°F</button>
+      </div>
+    </div>
+    <h1 id="location-name">Loading…</h1>
+    <div class="location-meta" id="location-meta"></div>
+    <div id="map"></div>
+    <div class="status-banner" id="status-banner">
+      <div class="status-icon" id="status-icon"></div>
+      <div>
+        <div class="status-text-main" id="status-main">Checking latest data…</div>
+        <div class="status-text-sub" id="status-sub"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="card">
+    <div class="section-title">7-day forecast</div>
+    <div class="section-sub">Daily air temperature, wind and surface (skin) temperature risk</div>
+    <div class="forecast-strip" id="forecast-strip">
+      <div class="loading-state">Loading forecast…</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Frost event history</div>
+    <div class="section-sub">Detected frost nights with type, severity and advisory</div>
+    <div class="event-list" id="event-list">
+      <div class="loading-state">Loading history…</div>
+    </div>
+  </div>
+
+  <footer>Data from meteoblue · Powered by the Frolight Frost Monitor · Updates daily · <a href="#" onclick="openMethodologyModal(); return false;" style="color:inherit;">How this data works</a></footer>
+  <div style="text-align:center; font-size:10.5px; color:#c2beae; margin-top:10px; line-height:1.5; max-width:640px; margin-left:auto; margin-right:auto;">
+    This dashboard provides data-driven forecasts and advisory guidance to support frost protection decisions. It is intended as an aid, not a guarantee — forecast data carries inherent uncertainty (see "data predictability" above), and it remains the customer's own responsibility to monitor conditions and activate the Frolight system in a timely manner.
+  </div>
+</div>
+
+<div class="modal-overlay" id="day-modal-overlay">
+  <div class="modal">
+    <div class="event-head" style="margin-bottom: 4px;">
+      <h2 id="day-modal-title">Loading…</h2>
+      <div class="badge-row" id="day-modal-badges"></div>
+    </div>
+    <div class="timing-row" id="day-modal-timing" style="display:none;"></div>
+    <div class="event-figures" id="day-modal-figures"></div>
+    <div class="advisory" id="day-modal-advisory"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" style="flex:1;" onclick="closeDayModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="methodology-modal-overlay">
+  <div class="modal">
+    <h2>How this data works</h2>
+    <div class="modal-sub">The methodology behind the numbers shown in this dashboard.</div>
+
+    <div class="form-group">
+      <label>Frost type &amp; severity</label>
+      <div style="font-size:13px; color:#44443f; line-height:1.6;">
+        <strong>Radiation frost</strong>: calm wind + large air/surface temperature gap (clear, still nights). <strong>Advection frost</strong>: sustained wind bringing in a cold air mass. <strong>Mixed</strong>: characteristics of both. Severity (Marginal / Moderate / Severe / Critical) is based on how far surface temperature drops below 0°C.
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Parameter glossary</label>
+      <div style="font-size:13px; color:#44443f; line-height:1.7;">
+        <strong>Surface (skin) temperature</strong> — the temperature of the crop surface itself (leaf, grape, ground), not the air. This is what actually determines frost damage, and can be several degrees colder than the air on clear, calm nights due to radiative heat loss.<br><br>
+        <strong>Air temperature</strong> — the standard temperature measured ~2m above the ground, as reported in typical weather forecasts.<br><br>
+        <strong>Wet bulb temperature</strong> — the lowest temperature air can reach through evaporative cooling, combining temperature and humidity. It's a property of the air, not the surface — but on a wet crop surface (dew, recent rain), evaporative cooling can pull the actual surface temperature down toward this value, even if the surface model alone shows a safe reading.<br><br>
+        <strong>Delta-T</strong> — the gap between air temperature and wet bulb temperature. A higher delta-T means drier air with more evaporative cooling potential — relevant both for frost risk and for spray timing.<br><br>
+        <strong>Relative humidity (min–max)</strong> — how much moisture the air holds, shown as the night's range rather than an average, since it typically peaks near the coldest pre-dawn point.<br><br>
+        <strong>Wind (avg / direction)</strong> — the night's average wind speed and prevailing direction, calculated over the same night window used for frost detection.<br><br>
+        <strong>Precipitation</strong> — total rainfall for the full calendar day (not limited to the night window).<br><br>
+        <strong>Data predictability</strong> — meteoblue's confidence score for the forecast itself; lower scores mean the figures above may still shift as the date approaches.
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" style="flex:1;" onclick="closeMethodologyModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const ENDPOINT = 'https://script.google.com/macros/s/AKfycbxkgD0nH7MDWcjCpjXsRy_Ek86ipclqi_65fS5iiIabBUB0VK8L63hYv0O2ym0zrpKkzg/exec';
+
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+let currentSiteId = null;
+let currentSiteUses12h = false;
+let currentUnit = 'C';
+let lastForecastFull = [];
+let lastEventsFull = [];
+let mapInstance = null;
+let mapMarker = null;
+let lastForecast = [];
+
+function updateMap(lat, lon, label) {
+  if (!mapInstance) {
+    mapInstance = L.map('map', { zoomControl: false, attributionControl: true }).setView([lat, lon], 16);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19,
+      attribution: '&copy; Esri'
+    }).addTo(mapInstance);
+    L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
+    mapMarker = L.marker([lat, lon]).addTo(mapInstance);
+  } else {
+    mapInstance.setView([lat, lon], 16);
+    mapMarker.setLatLng([lat, lon]);
+    setTimeout(() => mapInstance.invalidateSize(), 100);
+  }
+  mapMarker.bindPopup(label);
+}
+
+const ICONS = {
+  tempMax: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10.55a4 4 0 1 0 2 0V3a1 1 0 0 0-2 0Z"/><path d="M9 8h1M9 11h1"/></svg>',
+  tempMin: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10.55a4 4 0 1 0 2 0V3a1 1 0 0 0-2 0Z"/></svg>',
+  surface: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h20"/><path d="M6 20v-4c0-1 .5-2 1.5-2S9 15 9 16v4"/><path d="M11 20v-6c0-1 .5-2 1.5-2s1.5 1 1.5 2v6"/><path d="M16 20v-3c0-1 .5-2 1.5-2s1.5 1 1.5 2v3"/></svg>',
+  wind: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.59 4.59A2 2 0 1 1 11 8H2"/><path d="M12.59 19.41A2 2 0 1 0 14 16H2"/><path d="M17.73 7.73A2.5 2.5 0 1 1 19.5 12H2"/></svg>',
+  humidity: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69s5 5.5 5 9.87a5 5 0 0 1-10 0c0-4.37 5-9.87 5-9.87Z"/></svg>'
+};
+
+function fmtDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return { day: DAY_NAMES[d.getDay()], date: d.getDate() + ' ' + d.toLocaleString('en-US', { month: 'short' }) };
+}
+
+function severityClass(sev) {
+  return 'badge-severity-' + (sev || 'marginal').toLowerCase();
+}
+
+function formatTemp(celsius, decimals) {
+  decimals = decimals === undefined ? 1 : decimals;
+  if (celsius === '' || celsius === undefined || celsius === null || isNaN(Number(celsius))) return 'n/a';
+  const c = Number(celsius);
+  const val = currentUnit === 'F' ? (c * 9 / 5 + 32) : c;
+  return val.toFixed(decimals) + '°' + currentUnit;
+}
+
+// ------------------------------------------------------------
+// Client-side classification fallback — mirrors the Apps Script logic,
+// used when a forecast row hasn't been (re)processed server-side yet
+// (e.g. right after a code update, before the next scheduled run).
+// This means the popup always shows a complete, actionable advisory
+// instead of asking the person to wait for a server refresh.
+// ------------------------------------------------------------
+/**
+ * A "night" is named after the date its evening starts (e.g. "night of Aug 6"
+ * runs from 18:00 on Aug 6 through 10:00 on Aug 7). Hours 18:00-23:59 belong
+ * to that same calendar date; hours 00:00-10:00 actually fall on the NEXT
+ * calendar day. This combines a time with the correct day label so it's
+ * never ambiguous which date a given onset/deepest/end time belongs to.
+ */
+function frostTimeLabel(nightDateStr, timeStr) {
+  if (!timeStr) return null;
+  const hour = parseInt(timeStr.split(':')[0], 10);
+  const isNextDay = hour <= 10; // matches the 18:00–10:00 night window
+  const labelDate = new Date(nightDateStr + 'T00:00:00');
+  if (isNextDay) labelDate.setDate(labelDate.getDate() + 1);
+  const dayName = DAY_NAMES[labelDate.getDay()];
+  const timePart = formatFrostTime(timeStr) || timeStr;
+  return `${dayName} ${timePart}`;
+}
+
+function formatFrostTime(t) {
+  if (!t) return null;
+  return currentSiteUses12h ? formatTime12h(t) : t;
+}
+
+function formatTime12h(t) {
+  if (!t) return null;
+  const [hStr, mStr] = t.split(':');
+  let h = parseInt(hStr, 10);
+  const period = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${h}:${mStr} ${period}`;
+}
+
+function degToCompassJS(deg) {
+  const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+  return dirs[Math.round(deg / 22.5) % 16];
+}
+
+function classifyFrostTypeJS(avgWind, minAirTemp, minSkinTemp) {
+  const airSkinDiff = minAirTemp - minSkinTemp;
+  if (avgWind < 2 && airSkinDiff > 2.5) return 'Radiation frost';
+  if (avgWind >= 3) return 'Advection frost';
+  return 'Mixed frost';
+}
+
+function classifySeverityJS(minSkinTemp) {
+  if (minSkinTemp > 0) return 'None';
+  if (minSkinTemp <= -5) return 'Critical';
+  if (minSkinTemp <= -3) return 'Severe';
+  if (minSkinTemp <= -1) return 'Moderate';
+  return 'Marginal';
+}
+
+function generateAdviceJS(n) {
+  const parts = [];
+  const typeExplanations = {
+    'Radiation frost': `Radiation frost expected: clear skies and calm wind (avg ${n.avgWind.toFixed(1)} m/s) are allowing strong heat loss from the crop surface, so the surface cools well below air temperature (surface: ${n.minSkinTemp.toFixed(1)}°C vs air: ${n.minAirTemp.toFixed(1)}°C).`,
+    'Advection frost': `Advection frost expected: a sustained wind (avg ${n.avgWind.toFixed(1)} m/s from the ${n.windDirCompass}) is bringing in a cold air mass, so surface and air temperatures are closely aligned (surface: ${n.minSkinTemp.toFixed(1)}°C vs air: ${n.minAirTemp.toFixed(1)}°C).`,
+    'Mixed frost': `Mixed frost conditions: moderate wind (avg ${n.avgWind.toFixed(1)} m/s) with a partial temperature inversion, showing characteristics of both radiation and advection frost (surface: ${n.minSkinTemp.toFixed(1)}°C vs air: ${n.minAirTemp.toFixed(1)}°C).`
+  };
+  parts.push(typeExplanations[n.frostType]);
+
+  const activationAdvice = {
+    'Radiation frost': {
+      'Marginal': 'Activate Frolight roughly 1-2 hours before sunrise, focused on the coldest pre-dawn window.',
+      'Moderate': 'Activate Frolight shortly after sunset and maintain through to after sunrise — inversion and heat loss build up steadily overnight, with the coldest point just before dawn.',
+      'Severe': 'Activate Frolight early, shortly after sunset, and maintain continuously through sunrise. Given the depth of cooling, starting late risks the surface already being well below freezing before protection engages.',
+      'Critical': 'Activate Frolight as early as possible after sunset and maintain through well after sunrise. This is the highest-risk radiation frost scenario — early activation is critical to avoid damage before the coldest pre-dawn hours.'
+    },
+    'Advection frost': {
+      'Marginal': 'Activate Frolight once air temperature approaches 0-1°C — with this wind pattern, air temperature is a reliable trigger.',
+      'Moderate': 'Activate Frolight once air temperature nears freezing and maintain for as long as the cold air mass persists — this can extend beyond typical overnight hours.',
+      'Severe': 'Activate Frolight immediately and maintain continuously — surface temperature already indicates significant cooling, not an approaching risk; advection frost can persist through the day if the cold air mass does not clear.',
+      'Critical': 'Activate Frolight immediately and maintain continuously until the cold air mass clears — sustained wind means there is little natural relief overnight.'
+    },
+    'Mixed frost': {
+      'Marginal': 'Activate Frolight around 1-2 hours before the expected temperature minimum.',
+      'Moderate': 'Activate Frolight shortly after sunset and monitor closely, as conditions could shift toward either radiation- or advection-dominated cooling.',
+      'Severe': 'Activate Frolight early in the evening and maintain overnight, given the elevated risk from combined cooling mechanisms.',
+      'Critical': 'Activate Frolight as early as possible and maintain continuously — mixed conditions with this severity carry high uncertainty and warrant maximum protection.'
+    }
+  };
+  parts.push(activationAdvice[n.frostType][n.severity] || activationAdvice[n.frostType]['Moderate']);
+
+  const warnings = [];
+  if (n.minHumidity < 60) {
+    if (n.hasHumidityRange) {
+      warnings.push(`Relative humidity dropped as low as ${n.minHumidity.toFixed(0)}% overnight, meaning dry air offered little buffering at points — surface cooling may be deeper than the average trend suggests.`);
+    } else {
+      warnings.push(`Average relative humidity is low (${n.minHumidity.toFixed(0)}%), meaning dry air offers little buffering — the exact overnight low isn't available yet for this day (run the daily check to refresh), so actual conditions may be drier still.`);
+    }
+  }
+  if (n.avgWind >= 1 && n.avgWind <= 3 && n.frostType === 'Radiation frost') {
+    warnings.push('Light wind in this range can disrupt the inversion just enough without providing warming — monitor closely, as this can occasionally worsen rather than reduce risk.');
+  }
+  if (n.maxHumidity > 85) {
+    if (n.hasHumidityRange) {
+      warnings.push(`Relative humidity peaked at ${n.maxHumidity.toFixed(0)}% overnight (typically near the coldest pre-dawn point) — expect heavy dew or frost formation on the crop surface itself.`);
+    } else {
+      warnings.push(`Average relative humidity is high (${n.maxHumidity.toFixed(0)}%) — expect dew or frost formation on the crop surface itself. The exact overnight peak isn't available yet for this day (run the daily check to refresh); the true peak is likely at least this high.`);
+    }
+  }
+  if (n.predictability !== undefined && n.predictability !== null && n.predictability < 60) {
+    warnings.push(`This forecast currently has a lower data predictability score (${n.predictability}%) — recommend checking back closer to the date, as the figures above may still shift.`);
+  }
+  if (warnings.length > 0) parts.push(warnings.join(' '));
+
+  return parts.join(' ');
+}
+
+/** Builds a full classification from a Daily_Forecast row, using stored
+ * server-side values when present, and computing them client-side
+ * otherwise — so the result is always complete. */
+function generateWetBulbCautionJS(minSkinTemp, minWetBulb) {
+  return `Surface temperature is currently expected to stay above freezing (min ${minSkinTemp.toFixed(1)}°C), but wet bulb temperature drops to ${minWetBulb.toFixed(1)}°C overnight — at or below freezing. If the crop surface is wet (dew or recent rain), evaporative cooling could pull the actual surface temperature lower than currently modeled, especially under calm, clear conditions. Worth monitoring closely as the forecast is refined.`;
+}
+
+function classifyDay(d) {
+  const minSkinTemp = Number(d.minSkinTemp);
+  const minAirTemp = Number(d.minAirTemp);
+  const avgWind = Number(d.avgWind);
+  const avgHumidity = Number(d.avgRH);
+  const hasHumidityRange = d.minRH !== undefined && d.minRH !== '';
+  const minHumidity = hasHumidityRange ? Number(d.minRH) : avgHumidity;
+  const maxHumidity = hasHumidityRange ? Number(d.maxRH) : avgHumidity;
+
+  const hasServerSeverity = d.severity && d.severity !== '';
+  const severity = hasServerSeverity ? d.severity : classifySeverityJS(minSkinTemp);
+
+  if (severity === 'None') {
+    // No confirmed surface-temperature frost risk — but flag it if wet bulb
+    // temperature alone drops to freezing. A wet crop surface (dew, recent
+    // rain) could still cool below what the surface model currently shows,
+    // via evaporative cooling.
+    const minWetBulb = (d.minWetBulb !== '' && d.minWetBulb !== undefined) ? Number(d.minWetBulb) : null;
+    if (minWetBulb !== null && minWetBulb <= 0) {
+      const caution = (d.advisory && d.advisory !== '') ? d.advisory : generateWetBulbCautionJS(minSkinTemp, minWetBulb);
+      return { severity: 'None', wetBulbCaution: true, advisory: caution };
+    }
+    return { severity: 'None' };
+  }
+
+  const frostType = (d.frostType && d.frostType !== '') ? d.frostType : classifyFrostTypeJS(avgWind, minAirTemp, minSkinTemp);
+  const windDirCompass = (d.windDirCompass && d.windDirCompass !== '') ? d.windDirCompass : degToCompassJS(Number(d.windDirection));
+  const advisory = (d.advisory && d.advisory !== '') ? d.advisory : generateAdviceJS({
+    frostType, severity, avgWind, windDirCompass, minSkinTemp, minAirTemp, avgHumidity, minHumidity, maxHumidity, hasHumidityRange,
+    predictability: d.predictability !== undefined && d.predictability !== '' ? Number(d.predictability) : null
+  });
+
+  return { severity, frostType, windDirCompass, advisory };
+}
+
+function setUnit(unit) {
+  if (unit === currentUnit) return;
+  currentUnit = unit;
+  document.getElementById('unit-c-btn').classList.toggle('active', unit === 'C');
+  document.getElementById('unit-f-btn').classList.toggle('active', unit === 'F');
+  // Re-render from the already-fetched data — no need to re-fetch from the server
+  renderStatus(lastEventsFull);
+  renderForecast(lastForecastFull);
+  renderEvents(lastEventsFull);
+}
+
+function renderForecast(forecast) {
+  const el = document.getElementById('forecast-strip');
+  if (!forecast || forecast.length === 0) {
+    el.innerHTML = '<div class="empty-state">No forecast data yet. Run the daily check in Apps Script first.</div>';
+    return;
+  }
+  const today = new Date(); today.setHours(0,0,0,0);
+  const upcoming = forecast.filter(d => new Date(d.date + 'T00:00:00') >= today).slice(0, 7);
+  const toShow = upcoming.length > 0 ? upcoming : forecast.slice(-7);
+  lastForecast = toShow;
+
+  el.innerHTML = toShow.map((d, idx) => {
+    const { day, date } = fmtDate(d.date);
+    const skinRisk = d.minSkinTemp !== '' && d.minSkinTemp !== undefined && Number(d.minSkinTemp) <= 0;
+    return `
+      <div class="day-card ${skinRisk ? 'frost-risk' : ''}">
+        <button class="day-info-btn" onclick="openDayModal(${idx})" aria-label="More info" title="More info">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        </button>
+        <div class="day-name">${day}</div>
+        <div class="day-date">${date}</div>
+        <div class="day-temp-max">${ICONS.tempMax}${formatTemp(d.maxAirTemp, 0)}</div>
+        <div class="day-temp-min">${ICONS.tempMin}${formatTemp(d.minAirTemp, 0)} min</div>
+        <div class="day-skin ${skinRisk ? 'risk' : 'safe'}">
+          ${ICONS.surface}${formatTemp(d.minSkinTemp, 1)} surface
+        </div>
+        <div class="day-wind">${ICONS.wind}${Number(d.avgWind).toFixed(1)} m/s avg</div>
+        ${Number(d.predictability) < 60 ? `<div style="font-size:10px; color:#a3390f; margin-top:4px;">⚠ Low data predictability (${Number(d.predictability).toFixed(0)}%)</div>` : ''}
+        ${(!skinRisk && d.minWetBulb !== '' && d.minWetBulb !== undefined && Number(d.minWetBulb) <= 0) ? `<div style="font-size:10px; color:#1c4e73; margin-top:4px;">💧 Wet bulb near freezing</div>` : ''}
+      </div>`;
+  }).join('') + `
+    <div class="legend" style="grid-column: 1 / -1;">
+      <div class="legend-item">${ICONS.tempMax}Max air temperature</div>
+      <div class="legend-item">${ICONS.tempMin}Min air temperature</div>
+      <div class="legend-item">${ICONS.surface}Min surface (skin) temperature</div>
+      <div class="legend-item">${ICONS.wind}Avg overnight wind speed</div>
+    </div>`;
+}
+
+function openDayModal(idx) {
+  const d = lastForecast[idx];
+  if (!d) return;
+  const { day, date } = fmtDate(d.date);
+  const classification = classifyDay(d);
+  const confirmedRisk = classification.severity !== 'None';
+
+  document.getElementById('day-modal-title').textContent = `${day}, ${date}`;
+
+  document.getElementById('day-modal-badges').innerHTML = confirmedRisk
+    ? `<span class="badge badge-type">${classification.frostType}</span><span class="badge ${severityClass(classification.severity)}">${classification.severity}</span>`
+    : classification.wetBulbCaution
+      ? `<span class="badge" style="background:#dbe9f5;color:#1c4e73;">Watch — wet bulb near freezing</span>`
+      : `<span class="badge" style="background:#eef2ea;color:var(--mid-green);">No significant risk</span>`;
+
+  const timingEl = document.getElementById('day-modal-timing');
+  if (confirmedRisk && (d.frostStart || d.frostDeepest || d.frostEnd)) {
+    timingEl.style.display = '';
+    timingEl.innerHTML = `
+      <div class="timing-title">Frost event timing (local time)</div>
+      <div class="timing-step"><div class="fig-label">Onset</div><div class="fig-value">${frostTimeLabel(d.date, d.frostStart) || '—'}</div></div>
+      <div class="timing-arrow">→</div>
+      <div class="timing-step"><div class="fig-label">Deepest</div><div class="fig-value">${frostTimeLabel(d.date, d.frostDeepest) || '—'}</div></div>
+      <div class="timing-arrow">→</div>
+      <div class="timing-step"><div class="fig-label">Ends</div><div class="fig-value">${frostTimeLabel(d.date, d.frostEnd) || 'Ongoing at window edge'}</div></div>
+    `;
+  } else if (confirmedRisk) {
+    timingEl.style.display = '';
+    timingEl.innerHTML = `<div style="font-size:12px;color:#a3a196;">Timing not yet available for this day — run the daily check to refresh.</div>`;
+  } else {
+    timingEl.style.display = 'none';
+    timingEl.innerHTML = '';
+  }
+
+  const hasHumidityRange = d.minRH !== '' && d.minRH !== undefined;
+  const humidityLabel = hasHumidityRange ? 'Humidity (min–max)' : 'Avg humidity';
+  const humidityValue = hasHumidityRange
+    ? Number(d.minRH).toFixed(0) + '–' + Number(d.maxRH).toFixed(0) + '%'
+    : Number(d.avgRH).toFixed(0) + '%';
+
+  document.getElementById('day-modal-figures').innerHTML = `
+    <div><div class="fig-label">Surface min</div><div class="fig-value">${formatTemp(d.minSkinTemp, 1)}</div></div>
+    <div><div class="fig-label">Air min / max</div><div class="fig-value">${formatTemp(d.minAirTemp, 1)} / ${formatTemp(d.maxAirTemp, 1)}</div></div>
+    <div><div class="fig-label">Avg wind</div><div class="fig-value">${Number(d.avgWind).toFixed(1)} m/s${d.windDirCompass ? ' ' + d.windDirCompass : ''}</div></div>
+    <div><div class="fig-label">${humidityLabel}</div><div class="fig-value">${humidityValue}</div></div>
+    <div><div class="fig-label">Wet bulb min</div><div class="fig-value">${formatTemp(d.minWetBulb, 1)}</div></div>
+    <div><div class="fig-label">Delta-T</div><div class="fig-value">${d.avgDeltaT !== '' && d.avgDeltaT !== undefined ? Number(d.avgDeltaT).toFixed(1) : 'n/a'}</div></div>
+    <div><div class="fig-label">Precipitation</div><div class="fig-value">${Number(d.precipitation).toFixed(1)} mm</div></div>
+    <div><div class="fig-label">Data predictability</div><div class="fig-value">${d.predictability}%</div></div>
+  `;
+
+  document.getElementById('day-modal-advisory').textContent = confirmedRisk
+    ? classification.advisory
+    : classification.wetBulbCaution
+      ? classification.advisory
+      : 'No frost advisory for this day — surface temperature is expected to stay safely above freezing.';
+
+  document.getElementById('day-modal-overlay').classList.add('open');
+}
+
+function closeDayModal() {
+  document.getElementById('day-modal-overlay').classList.remove('open');
+}
+
+function openMethodologyModal() {
+  document.getElementById('methodology-modal-overlay').classList.add('open');
+}
+
+function closeMethodologyModal() {
+  document.getElementById('methodology-modal-overlay').classList.remove('open');
+}
+
+function renderEvents(events) {
+  const el = document.getElementById('event-list');
+  if (!events || events.length === 0) {
+    el.innerHTML = '<div class="empty-state">No frost events logged yet.</div>';
+    return;
+  }
+  // Safety net: keep only one event per date, even if the sheet contains
+  // duplicate rows (e.g. leftover from before upsert logic was added).
+  const byDate = {};
+  events.forEach(ev => { byDate[ev.date] = ev; });
+  const deduped = Object.values(byDate);
+
+  const sorted = deduped.sort((a, b) => b.date.localeCompare(a.date));
+  el.innerHTML = sorted.map(ev => {
+    const { day, date } = fmtDate(ev.date);
+    return `
+      <div class="event">
+        <div class="event-head">
+          <div class="event-date">${day}, ${date}</div>
+          <div class="badge-row">
+            <span class="badge badge-type">${ev.type}</span>
+            <span class="badge ${severityClass(ev.severity)}">${ev.severity}</span>
+          </div>
+        </div>
+        ${(ev.frostStart || ev.frostDeepest || ev.frostEnd) ? `
+        <div class="timing-row">
+          <div class="timing-title">Frost event timing (local time)</div>
+          <div class="timing-step"><div class="fig-label">Onset</div><div class="fig-value">${frostTimeLabel(ev.date, ev.frostStart) || '—'}</div></div>
+          <div class="timing-arrow">→</div>
+          <div class="timing-step"><div class="fig-label">Deepest</div><div class="fig-value">${frostTimeLabel(ev.date, ev.frostDeepest) || '—'}</div></div>
+          <div class="timing-arrow">→</div>
+          <div class="timing-step"><div class="fig-label">Ends</div><div class="fig-value">${frostTimeLabel(ev.date, ev.frostEnd) || 'Ongoing at window edge'}</div></div>
+        </div>` : `
+        <div class="timing-row">
+          <div class="timing-title">Frost event timing (local time)</div>
+          <div style="font-size:12px; color:#a3a196; flex-basis:100%; text-align:center;">Timing not available for this event — it occurred before timing tracking was added, or has since aged out of the forecast window.</div>
+        </div>`}
+        <div class="event-figures">
+          <div><div class="fig-label">Surface min</div><div class="fig-value">${formatTemp(ev.minSkinTemp, 1)}</div></div>
+          <div><div class="fig-label">Air min</div><div class="fig-value">${formatTemp(ev.minAirTemp, 1)}</div></div>
+          <div><div class="fig-label">Avg wind</div><div class="fig-value">${Number(ev.avgWind).toFixed(1)} m/s</div></div>
+          <div><div class="fig-label">Direction</div><div class="fig-value">${ev.windDirection}</div></div>
+          <div><div class="fig-label">Avg humidity</div><div class="fig-value">${Number(ev.avgRH).toFixed(0)}%</div></div>
+          <div><div class="fig-label">Delta-T</div><div class="fig-value">${Number(ev.avgDeltaT).toFixed(1)}</div></div>
+        </div>
+        <div class="advisory">${ev.advisory}</div>
+      </div>`;
+  }).join('');
+}
+
+const ICON_SNOWFLAKE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93 4.93 19.07"/><path d="m12 6-2 2M12 6l2 2M12 18l-2-2M12 18l2-2M6 12l2-2M6 12l2 2M18 12l-2-2M18 12l-2 2"/></svg>';
+const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+
+function renderStatus(events) {
+  const banner = document.getElementById('status-banner');
+  const icon = document.getElementById('status-icon');
+  const main = document.getElementById('status-main');
+  const sub = document.getElementById('status-sub');
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const latestEvent = events && events.length > 0 ? [...events].sort((a,b) => b.date.localeCompare(a.date))[0] : null;
+
+  banner.className = 'status-banner';
+  icon.classList.remove('safe');
+
+  // Treat any event within 1 day of "today" as current — a strict date match
+  // can miss events when the viewer's browser timezone differs from the
+  // site's local timezone (e.g. checking an Australian site from Belgium).
+  let isCurrent = false;
+  if (latestEvent) {
+    const eventDate = new Date(latestEvent.date + 'T00:00:00');
+    const dayDiff = Math.round((eventDate - today) / 86400000);
+    isCurrent = Math.abs(dayDiff) <= 1;
+  }
+
+  if (latestEvent && isCurrent) {
+    banner.classList.add('severity-' + (latestEvent.severity || 'marginal').toLowerCase());
+    icon.innerHTML = ICON_SNOWFLAKE;
+    main.textContent = `Frost detected — ${latestEvent.severity} ${latestEvent.type}`;
+    sub.textContent = `Surface temperature dropped to ${formatTemp(latestEvent.minSkinTemp, 1)}`;
+  } else {
+    icon.classList.add('safe');
+    icon.innerHTML = ICON_CHECK;
+    main.textContent = 'No frost risk currently detected';
+    sub.textContent = events && events.length > 0 ? `Last frost event: ${latestEvent.date}` : 'No frost events logged yet';
+  }
+}
+
+function refreshDashboard() {
+  if (!currentSiteId) return;
+  const btn = document.getElementById('refresh-btn');
+  btn.classList.add('spinning');
+  document.getElementById('forecast-strip').innerHTML = '<div class="loading-state">Loading forecast…</div>';
+  document.getElementById('event-list').innerHTML = '<div class="loading-state">Loading history…</div>';
+  loadSiteData(currentSiteId).finally(() => btn.classList.remove('spinning'));
+}
+
+// This is a single-site, client-facing dashboard: the site is fixed and
+// cannot be changed, added, or removed from here — that's intentionally
+// only possible from the internal multi-site admin dashboard.
+const FIXED_SITE_ID = 'riversdale-estate-winery';
+
+function loadFixedSite() {
+  currentSiteId = FIXED_SITE_ID;
+  loadSiteData(FIXED_SITE_ID);
+}
+
+async function loadSiteData(siteId) {
+  try {
+    const res = await fetch(ENDPOINT + '?site=' + encodeURIComponent(siteId));
+    if (!res.ok) throw new Error('Request failed: ' + res.status);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    document.getElementById('location-name').textContent = data.site.name;
+    document.getElementById('location-meta').textContent =
+      `${Number(data.site.lat).toFixed(4)}, ${Number(data.site.lon).toFixed(4)} · Last updated ${new Date(data.generatedAt).toLocaleString('en-US')}`;
+    currentSiteUses12h = !!data.site.uses12h;
+
+    updateMap(data.site.lat, data.site.lon, data.site.name);
+
+    lastForecastFull = data.forecast;
+    lastEventsFull = data.frostEvents;
+    renderStatus(data.frostEvents);
+    renderForecast(data.forecast);
+    renderEvents(data.frostEvents);
+  } catch (err) {
+    document.getElementById('status-main').textContent = 'Could not load data';
+    document.getElementById('status-sub').textContent = err.message;
+    document.getElementById('forecast-strip').innerHTML =
+      '<div class="error-state">Could not reach the data endpoint. Check the Web App deployment URL and access settings.</div>';
+    document.getElementById('event-list').innerHTML = '';
+  }
+}
+
+loadFixedSite();
+
+
+</script>
+
+</body>
+</html>
